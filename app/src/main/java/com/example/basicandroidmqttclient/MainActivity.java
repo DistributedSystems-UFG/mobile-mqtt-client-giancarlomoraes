@@ -6,7 +6,10 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.content.Intent;
 import android.view.View;
+import android.widget.ArrayAdapter;
+
 import android.widget.EditText;
+import android.widget.ListView;
 import android.widget.TextView;
 
 import com.hivemq.client.mqtt.datatypes.MqttQos;
@@ -18,10 +21,14 @@ import java.util.UUID;
 
 public class MainActivity extends AppCompatActivity {
     public static final String EXTRA_MESSAGE = "com.example.basicandroidmqttclient.MESSAGE";
-    public static final String brokerURI = "3.223.10.115";
+    public static final String brokerURI = "3.216.219.0";
 
     Activity thisActivity;
     TextView subMsgTextView;
+
+    private ListView listViewSubMsg;
+    private ArrayAdapter<String> listAdapter;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -29,7 +36,10 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         thisActivity = this;
-        subMsgTextView = (TextView) findViewById(R.id.editTextMultiLineSubMsg);
+        listViewSubMsg = findViewById(R.id.listViewSubMsg);
+        listAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1);
+        listViewSubMsg.setAdapter(listAdapter);
+
     }
 
     /** Called when the user taps the Send button */
@@ -44,12 +54,18 @@ public class MainActivity extends AppCompatActivity {
                 .buildBlocking();
 
         client.connect();
-        client.publishWith().topic(topicName.getText().toString()).qos(MqttQos.AT_LEAST_ONCE).payload(value.getText().toString().getBytes()).send();
+
+        int temperatura = Integer.parseInt(value.getText().toString());
+        String payloadString = Integer.toString(temperatura);
+        byte[] payloadBytes = payloadString.getBytes();
+
+
+        client.publishWith().topic(topicName.getText().toString()).qos(MqttQos.AT_LEAST_ONCE).payload(payloadBytes).send();
         client.disconnect();
 
-        String message = topicName.getText().toString() + " " + value.getText().toString();
-        intent.putExtra(EXTRA_MESSAGE, message);
-        startActivity(intent);
+//        String message = topicName.getText().toString() + " " + value.getText().toString();
+//        intent.putExtra(EXTRA_MESSAGE, message);
+//        startActivity(intent);
     }
 
     public void sendSubscription(View view) {
@@ -62,16 +78,17 @@ public class MainActivity extends AppCompatActivity {
 
         client.connect();
 
+        // Limpe a lista antes de adicionar novos elementos
+        listAdapter.clear();
+
         // Use a callback to show the message on the screen
         client.toAsync().subscribeWith()
                 .topicFilter(topicName.getText().toString())
                 .qos(MqttQos.AT_LEAST_ONCE)
                 .callback(msg -> {
-                    thisActivity.runOnUiThread(new Runnable() {
-                        public void run() {
-                            //tv.setText(msg.toString());
-                            subMsgTextView.setText(new String(msg.getPayloadAsBytes(), StandardCharsets.UTF_8));
-                        }
+                    thisActivity.runOnUiThread(() -> {
+                        String message = new String(msg.getPayloadAsBytes(), StandardCharsets.UTF_8);
+                        listAdapter.add("Temperatura: " + message);
                     });
                 })
                 .send();
